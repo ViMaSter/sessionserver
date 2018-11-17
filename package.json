@@ -1,0 +1,47 @@
+{
+  "name": "SessionServer",
+  "version": "0.1.0",
+  "description": "Simple session server primarly for use with multiplayer games",
+  "main": "dist/server.js",
+  "types": "dist/server.d.ts",
+  "test": "jest",
+  "scripts": {
+    "prepublish": "npm run build",
+    "build": "webpack --config conf/prod.config.js",
+    "watch": "webpack --config conf/dev.config.js",
+    "test": "jest --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/ViMaSter/sessionserver.git"
+  },
+  "keywords": [
+    "multiplayer",
+    "session",
+    "server"
+  ],
+  "author": "Vincent Mahnke",
+  "license": "GPL-3.0-or-later",
+  "bugs": {
+    "url": "https://github.com/ViMaSter/sessionserver/issues"
+  },
+  "homepage": "https://github.com/ViMaSter/sessionserver",
+  "devDependencies": {
+    "@types/jest": "^23.3.5",
+    "@types/node": "^10.12.0",
+    "@types/websocket": "0.0.40",
+    "dts-bundle": "^0.7.3",
+    "http-shutdown": "^1.2.0",
+    "jest": "^23.6.0",
+    "jest-extended": "^0.11.0",
+    "ts-jest": "^23.10.4",
+    "ts-loader": "^5.2.2",
+    "typescript": "^3.1.3",
+    "webpack": "^4.20.2",
+    "webpack-cli": "^3.1.1"
+  },
+  "dependencies": {
+    "http": "0.0.0",
+    "websocket": "^1.0.28"
+  }
+}
