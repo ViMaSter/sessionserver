@@ -2,13 +2,13 @@
   "name": "SessionServer",
   "version": "0.1.0",
   "description": "Simple session server primarly for use with multiplayer games",
-  "main": "dist/server.js",
+  "main": "dist/main.js",
   "types": "dist/server.d.ts",
   "test": "jest",
   "scripts": {
     "prepublish": "npm run build",
-    "build": "webpack --config conf/prod.config.js",
-    "watch": "webpack --config conf/dev.config.js",
+    "build": "tsc",
+    "watch": "tsc -w",
     "test": "jest --watch"
   },
   "repository": {
