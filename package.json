@@ -6,7 +6,7 @@
   "types": "dist/server.d.ts",
   "test": "jest",
   "scripts": {
-    "prepublish": "npm run build",
+    "prepare": "npm run build",
     "build": "tsc",
     "watch": "tsc -w",
     "test": "jest --watch"
