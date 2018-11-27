@@ -1,5 +1,4 @@
 import {SessionServer} from "./SessionServer" 
-import {ISessionData} from "./SessionDataInterface" 
 
 type resolveCallback = (isMatch : boolean) => void;
 type rejectCallback = () => void;
@@ -7,7 +6,7 @@ class PingPong
 {
 	private sentMessage : string;
 	private expectedResponse : RegExp;
-	private websocketClient : WebSocket;
+	private client : WebSocket;
 	private isMatch : boolean;
 
 	private resolveMethod : any = () => {};
@@ -15,7 +14,7 @@ class PingPong
  
 	public constructor(client : WebSocket, ping : string, pong : RegExp, isMatch : boolean)
 	{
-		this.websocketClient = client;
+		this.client = client;
 		this.sentMessage = ping;
 		this.expectedResponse = pong;
 		this.isMatch = isMatch;
@@ -24,15 +23,15 @@ class PingPong
 	public Execute() : Promise<any>
 	{ 
 		return new Promise<any>(((resolve : resolveCallback, reject : rejectCallback)=>{
-			this.websocketClient.addEventListener("message", this.handleMessage.call(this, resolve, reject));
-			this.websocketClient.addEventListener("close", this.handleClose.call(this, resolve, reject));
-			this.websocketClient.send(this.sentMessage);
+			this.client.addEventListener("message", this.handleMessage.call(this, resolve, reject));
+			this.client.addEventListener("close", this.handleClose.call(this, resolve, reject));
+			this.client.send(this.sentMessage);
 		}).bind(this));
 	}
 	private handleMessage(resolve : resolveCallback, reject : rejectCallback)
 	{
 		this.resolveMethod = (message : MessageEvent) => {
-			this.websocketClient.removeEventListener("message", this.resolveMethod);
+			this.client.removeEventListener("message", this.resolveMethod);
 			if (this.isMatch)
 			{
 				expect(message.data).toMatch(this.expectedResponse);
@@ -48,84 +47,113 @@ class PingPong
 	private handleClose(resolve : resolveCallback, reject : rejectCallback)
 	{
 		this.rejectMethod = () => {
-			this.websocketClient.removeEventListener("close", this.rejectMethod);
+			this.client.removeEventListener("close", this.rejectMethod);
 			reject();
 		};
 		return this.rejectMethod;
 	}
 }
 
-class GameData implements ISessionData
-{
-	playerPositionX : number = -1;
-	playerPositionY : number = -1;
-	constructor(parameters : any)
-	{
-		if (typeof parameters.playerPositionX == "number")
-		{
-			this.playerPositionX = parameters.playerPositionX;
-		}
-		if (typeof parameters.playerPositionY == "number")
-		{
-			this.playerPositionY = parameters.playerPositionY;
-		}
-	}
-
-	Update(parameters : any) : void
-	{
-		if (typeof parameters.playerPositionX == "number")
-		{
-			this.playerPositionX = parameters.playerPositionX;
-		}
-		if (typeof parameters.playerPositionY == "number")
-		{
-			this.playerPositionY = parameters.playerPositionY;
-		}
-	}
-};
-
 describe('SessionServer example session', () => {
 
-	const correctPort : number = 7000;
+	const secureConnection : boolean = false;
+	const hostname : string = "localhost";
+	const port : number = 7000;
+	
 	let server : SessionServer;
+	let client : WebSocket;
+
+	let sessionID : number = -1;
+	let playerID : number = -1;
 
 	beforeAll(async () => {
-		server = await SessionServer.Create(GameData, correctPort);
+		// create a server
+		server = await SessionServer.Create(port);
+
+		// create a client
+		client = new WebSocket(`${secureConnection?"wss":"ws"}://${hostname}:${port}/`);
+
+		// create listeners and wait for success
+		await expect(new Promise((resolve, reject)=>{
+			client.addEventListener("open", async () => {
+				// create session and retrieve ID
+				const createSessionRequest : any = await new PingPong(client,
+					'{"command":"createSession","session": {"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player": {"name":"Unnamed Player","position":{"x":-1, "y":-1},"colorHex":49407}}',
+					/{"command":"sessionJoin","sessionID":(\d+),"playerID":(\d+),"session":{"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player": {"name":"Unnamed Player","position":{"x":-1, "y":-1},"colorHex":49407}}/
+				, true).Execute();
+				sessionID = parseInt(createSessionRequest[1]);
+				playerID = parseInt(createSessionRequest[2]);
+				expect(sessionID).toBeGreaterThan(-1);
+				expect(playerID).toBeGreaterThan(-1);
+				resolve();
+			})
+			client.addEventListener("close", async () => {
+				reject();
+			});
+		})).resolves.toBeUndefined();
 	});
 
 	afterAll(() => {
+		client.close();
 		server.Shutdown();
 	});
 
-	test('correct raw message ping-pong', async () => {
-		const websocketClient : WebSocket = new WebSocket(`ws://localhost:${correctPort}/`);
-		await new Promise((resolve, reject)=>{
-			websocketClient.addEventListener("open", async () => {
-				// create session and retrieve ID
-				const createSessionRequest : any = await new PingPong(websocketClient,
-					'{"command":"createSession","parameters": {"playerPositionX":20,"playerPositionY":20}}',
-					/{"command":"sessionJoin","sessionID":(\d+),"session":{"playerPositionX":20,"playerPositionY":20}}/
-				, true).Execute();
-				const createSessionID : number = parseInt(createSessionRequest[1]);
-				expect(createSessionID).toBeGreaterThan(-1);
+	test('leaveSession + createSession (same parameters)', async () => {
+		// leave session and verify ID
+		const leaveSessionRequest : any = await new PingPong(client,
+			'{"command": "leaveSession" }',
+			/{"command":"sessionLeave", "sessionID": (\d+)/
+		, true).Execute();
+		const leftSessionID : number = parseInt(leaveSessionRequest[1]);
+		expect(leftSessionID).toBe(sessionID);
 
-				// update a piece and expect session update
-				const updateSessionRequest : any = await new PingPong(websocketClient,
-					'{"command": "updateSession", "sessionID": '+createSessionID+', "parameters": {"playerPositionX":30,"playerPositionY":30} }',
-					/{"command":"sessionUpdate","sessionID":(\d+),"session":{"playerPositionX":30,"playerPositionY":30}}/
-				, true).Execute();
+		// create session and retrieve ID
+		const createSessionRequest : any = await new PingPong(client,
+			'{"command":"createSession","session": {"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player": {"name":"Unnamed Player","position":{"x":-1, "y":-1},"colorHex":49407}}',
+			/{"command":"sessionJoin","sessionID":(\d+),"playerID":(\d+),"session":{"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player": {"name":"Unnamed Player","position":{"x":-1, "y":-1},"colorHex":49407}}/
+		, true).Execute();
+		const newSessionID : number = parseInt(createSessionRequest[1]);
+		const newPlayerID : number = parseInt(createSessionRequest[2]);
+		expect(sessionID).not.toBe(newSessionID);
+		expect(newPlayerID).toBe(playerID);
 
-				// leave session
-				await new PingPong(websocketClient,
-					'{"command": "leaveSession", "sessionID": '+createSessionID+' }',
-					new RegExp('{"command":"sessionLeave","sessionID":'+createSessionID+'}')
-				, true).Execute();
-				resolve();
-			});
-			websocketClient.addEventListener("close", async () => {
-				reject();
-			});
-		});
-		websocketClient.close();
+		sessionID = newSessionID;
+		playerID = newPlayerID;
+	});
+
+
+	test('leaveSession + updateSession (fails) + createSession (same parameters)', async () => {
+		// leave session and verify ID
+		const leaveSessionRequest : any = await new PingPong(client,
+			'{"command": "leaveSession" }',
+			/{"command":"sessionLeave", "sessionID": (\d+)}/
+		, true).Execute();
+		const leftSessionID : number = parseInt(leaveSessionRequest[1]);
+		expect(leftSessionID).toBe(sessionID);
+
+		const updateSessionRequest : any = await new PingPong(client,
+			'{"command":"updateSession","session": {"mapName":"desert","gameType":"CaptureTheFlag","currentMatchStart":1543237287000},"player": {"name":"New Player","position":{"x":-20, "y":-20},"colorHex":16673386}}',
+			/{"command":"sessionUpdate","session":{},"player": {}/
+		, true).Execute();
+
+		// create session and retrieve ID
+		const createSessionRequest : any = await new PingPong(client,
+			'{"command":"createSession","session": {"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player": {"name":"Unnamed Player","position":{"x":-1, "y":-1},"colorHex":49407}}',
+			/{"command":"sessionJoin","sessionID":(\d+),"playerID":(\d+),"session":{"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player": {"name":"Unnamed Player","position":{"x":-1, "y":-1},"colorHex":49407}}/
+		, true).Execute();
+		const newSessionID : number = parseInt(createSessionRequest[1]);
+		const newPlayerID : number = parseInt(createSessionRequest[2]);
+		expect(sessionID).not.toBe(newSessionID);
+		expect(newPlayerID).toBe(playerID);
+
+		sessionID = newSessionID;
+		playerID = newPlayerID;
+	});
+
+	test('updateSession', async () => {
+		const updateSessionRequest : any = await new PingPong(client,
+			'{"command":"updateSession","session": {"mapName":"desert","gameType":"CaptureTheFlag","currentMatchStart":1543237287000},"player": {"name":"New Player","position":{"x":-20, "y":-20},"colorHex":16673386}}',
+			/{"command":"sessionUpdate","session":{"mapName":"desert","gameType":"CaptureTheFlag","currentMatchStart":1543237287000},"player": {"name":"New Player","position":{"x":-20, "y":-20},"colorHex":16740352}}/
+		, true).Execute();
 	});
 });

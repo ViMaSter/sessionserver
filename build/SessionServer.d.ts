@@ -3,25 +3,23 @@ declare global {
         remove(elem: T): Array<T>;
     }
 }
-import { ISessionDataConstructor as ISessionDataConstructor } from './SessionDataInterface';
 export declare class SessionServer {
     private commands;
     private nextSessionID;
     private sessions;
     private nextPlayerID;
     private player;
-    private sessionType;
+    private sessionIDByPlayerID;
     private port;
     private httpServer;
     private wsServer;
-    private validateSessionID;
     private setupCommands;
     private generatePlayerMessageHandler;
     private generatePlayerCloseHandler;
+    private addPlayer;
     private removePlayer;
-    private handleNewPlayer;
     private constructor();
-    static Create(sessionType: ISessionDataConstructor, port: number): Promise<SessionServer>;
+    static Create(port: number): Promise<SessionServer>;
     Shutdown(): Promise<void>;
     Running(): boolean;
     private generatePlayerID;
