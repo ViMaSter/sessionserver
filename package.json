@@ -9,7 +9,7 @@
     "prepare": "npm run build",
     "build": "tsc",
     "watch": "tsc -w",
-    "test": "jest --watch"
+    "test": "jest"
   },
   "repository": {
     "type": "git",
