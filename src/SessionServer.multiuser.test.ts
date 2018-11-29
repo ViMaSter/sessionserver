@@ -65,7 +65,7 @@ describe('SessionServer multi user session', () => {
 
 	const secureConnection : boolean = false;
 	const hostname : string = "localhost";
-	const port : number = 7000;
+	const port : number = 7001;
 	
 	let server : SessionServer;
 	let client : WebSocket;
@@ -116,6 +116,11 @@ describe('SessionServer multi user session', () => {
 		})).resolves.toBeUndefined();
 	});
 
+	afterAll(async () => {
+		client.close();
+		client2.close();
+		await server.Shutdown();
+	});
 
 	beforeEach(() => {
 		// clear message stacks
@@ -337,11 +342,5 @@ describe('SessionServer multi user session', () => {
 			'{"command": "leaveSession" }',
 			/{"command":"sessionLeave","error":0}/
 		, true).Execute();
-	});
-
-	afterAll(() => {
-		client.close();
-		client2.close();
-		server.Shutdown();
 	});
 });

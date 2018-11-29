@@ -152,10 +152,7 @@ class Session {
 };
 
 import * as http from 'http';
-import * as ws from 'websocket';
-
-//@ts-ignore
-import httpShutdown from 'http-shutdown';
+import * as ws from 'ws';
 
 type commandSignature = (playerID : number, jsonMessage : any) => any;
 export class SessionServer
@@ -166,13 +163,13 @@ export class SessionServer
 	private sessions : {[ID : number]: Session} = {};
 
 	private nextPlayerID : number = 0;
-	private player : {[ID : number]: ws.connection} = {};
+	private player : {[ID : number]: ws} = {};
 	private sessionIDByPlayerID : {[ID : number]: number} = {};
 
 	private port : number = -1;
 
 	private httpServer : any;
-	private wsServer : ws.server;
+	private wsServer : ws.Server;
 
 	private setupCommands()
 	{
@@ -367,43 +364,43 @@ export class SessionServer
 				return;
 			}
 
-			if (!this.sessions[this.sessionIDByPlayerID[playerID]].RemovePlayerByID(playerID))
+			// store session and player ID to inform potential remaining clients
+			const leavingPlayerID = playerID;
+			const sessionID = this.sessionIDByPlayerID[leavingPlayerID];
+
+			if (!this.sessions[sessionID].RemovePlayerByID(leavingPlayerID))
 			{
-				this.sendMessageToPlayer(playerID, JSON.stringify({
+				this.sendMessageToPlayer(leavingPlayerID, JSON.stringify({
 					"command": "sessionLeave",
 					"error": 4
 				}));
 				return;
 			}
 
-			console.log(`[SessionServer] Players remaining in session ${this.sessionIDByPlayerID[playerID]}: ${this.sessions[this.sessionIDByPlayerID[playerID]].CurrentPlayerCount}`);
-			if (!this.sessions[this.sessionIDByPlayerID[playerID]].CurrentPlayerCount)
+			console.log(`[SessionServer] Players remaining in session ${this.sessionIDByPlayerID[leavingPlayerID]}: ${this.sessions[this.sessionIDByPlayerID[leavingPlayerID]].CurrentPlayerCount}`);
+			if (!this.sessions[this.sessionIDByPlayerID[leavingPlayerID]].CurrentPlayerCount)
 			{
-				console.log(`[SessionServer] Session ${this.sessionIDByPlayerID[playerID]} has no players left; discarding it`);
-				delete this.sessions[this.sessionIDByPlayerID[playerID]];
+				console.log(`[SessionServer] Session ${this.sessionIDByPlayerID[leavingPlayerID]} has no players left; discarding it`);
+				delete this.sessions[this.sessionIDByPlayerID[leavingPlayerID]];
 			}
 
-			// store session and player ID to inform potential remaining clients
-			const leavingPlayerID = playerID;
-			const sessionIDLeft = this.sessionIDByPlayerID[leavingPlayerID];
-
 			// reset association of player
-			this.sessionIDByPlayerID[playerID] = -1;
+			this.sessionIDByPlayerID[leavingPlayerID] = -1;
 
 			// inform leaving player about success
-			this.sendMessageToPlayer(playerID, JSON.stringify({
+			this.sendMessageToPlayer(leavingPlayerID, JSON.stringify({
 				"command": "sessionLeave",
 				"error": 0
 			}));
 
 			// inform remaining players about leaving player
 			// sessions are destroyed, if the last player left
-			if (!this.sessions[sessionIDLeft])
+			if (!this.sessions[sessionID])
 			{
 				return;
 			}
 			// send message about leaving player
-			this.sessions[sessionIDLeft].ForEachPlayer(((playerID : number) =>
+			this.sessions[sessionID].ForEachPlayer(((playerID : number) =>
 			{
 				this.sendMessageToPlayer(playerID, JSON.stringify({
 					"command": "playerLeave",
@@ -416,38 +413,34 @@ export class SessionServer
 
 	private generatePlayerMessageHandler(playerID : number)
 	{
-		return (message : ws.IMessage) => {
-			if (message.type === 'utf8')
+		return (data : any) => {
+			try
 			{
-				try
-				{
-					const jsonMessage = JSON.parse(message.utf8Data as string);
-					this.handleMessage(playerID, jsonMessage);
-				}
-				catch(e)
-				{
-					console.group("Invalid JSON string received");
-					console.error(message);
-					console.error(e);
-					console.groupEnd();
-				}
+				const jsonMessage = JSON.parse(data as string);
+				this.handleMessage(playerID, jsonMessage);
+			}
+			catch(e)
+			{
+				console.group("Invalid JSON string received");
+				console.error(data);
+				console.error(e);
+				console.groupEnd();
 			}
 		};
 	}
 
 	private generatePlayerCloseHandler(playerID : number)
 	{
-		return (reasonCode : number, description : string) => {
+		return (reasonCode : number, description : string) =>
+		{
 			this.removePlayer(playerID);
 		};
 	}
 
-	private addPlayer(request : ws.request)
+	private addPlayer(socket : ws, request: http.IncomingMessage)
 	{
-		const connection : ws.connection = request.accept(undefined, request.origin);
-		
 		const playerID : number = this.generatePlayerID();
-		this.player[playerID] = connection;
+		this.player[playerID] = socket;
 		this.sessionIDByPlayerID[playerID] = -1;
 
 		this.player[playerID].on('message', this.generatePlayerMessageHandler(playerID));
@@ -458,6 +451,13 @@ export class SessionServer
 	private removePlayer(playerID : number)
 	{
 		console.log(`[SessionServer] Connection from player ${playerID} closed...`);
+		if (!this.player[playerID])
+		{
+			console.log(`[SessionServer] Player ${playerID} gracefully disconnected...`);
+			return;
+		}
+		
+		console.log(`[SessionServer] Player ${playerID} was still connected - cleaning up...`);
 		if (this.sessionIDByPlayerID[playerID] != -1)
 		{
 			this.commands.leaveSession(playerID, {});
@@ -466,15 +466,15 @@ export class SessionServer
 
 		delete this.player[playerID];
 		delete this.sessionIDByPlayerID[playerID];
+		console.log(`[SessionServer] Player ${playerID} removed`);
 	}
 
 	private constructor(port : number)
 	{
 		this.port = port;
 
-		this.httpServer = httpShutdown(http.createServer(() => {}));
-
-		this.wsServer = new ws.server({ httpServer: this.httpServer });
+		this.httpServer = http.createServer();
+		this.wsServer = new ws.Server({server: this.httpServer});
 	}
 
 	static Create(port : number) : Promise<SessionServer>
@@ -485,7 +485,7 @@ export class SessionServer
 
 			newServer.setupCommands();
 
-			newServer.wsServer.on('request', newServer.addPlayer.bind(newServer));
+			newServer.wsServer.on('connection', newServer.addPlayer.bind(newServer));
 
 			newServer.httpServer.on('listening', () =>
 			{
@@ -493,9 +493,10 @@ export class SessionServer
 				resolve(newServer);
 			});
 
-			newServer.wsServer.on('error', () =>
+			newServer.wsServer.on('error', (error : any) =>
 			{
 				console.group(`[SessionServer] Error initializing server`);
+				console.error(error);
 				reject();
 			});
 
@@ -506,7 +507,9 @@ export class SessionServer
 	Shutdown() : Promise<void>
 	{
 		return new Promise((resolve, reject) => {
-			this.httpServer.shutdown(()=>{
+			this.httpServer.close(()=>
+			{
+				this.wsServer.close();
 				resolve();
 			});
 		});
@@ -552,6 +555,12 @@ export class SessionServer
 
 		console.log("Message to " + playerID);
 		console.log(message);
+		if (this.player[playerID].readyState != 1)
+		{
+			console.warn("[SessionServer] Can't send message to player, since the connection is (already) unavailable - readyState: " + this.player[playerID].readyState);
+			return;
+		}
+
 		this.player[playerID].send(message);
 		return true;
 	}

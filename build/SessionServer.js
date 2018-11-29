@@ -6,9 +6,6 @@ var __importStar = (this && this.__importStar) || function (mod) {
     result["default"] = mod;
     return result;
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 if (Array.prototype.remove) {
     Array.prototype.remove = function (elem) {
@@ -120,9 +117,7 @@ class Session {
 }
 ;
 const http = __importStar(require("http"));
-const ws = __importStar(require("websocket"));
-//@ts-ignore
-const http_shutdown_1 = __importDefault(require("http-shutdown"));
+const ws = __importStar(require("ws"));
 class SessionServer {
     constructor(port) {
         this.commands = {};
@@ -133,8 +128,8 @@ class SessionServer {
         this.sessionIDByPlayerID = {};
         this.port = -1;
         this.port = port;
-        this.httpServer = http_shutdown_1.default(http.createServer(() => { }));
-        this.wsServer = new ws.server({ httpServer: this.httpServer });
+        this.httpServer = http.createServer();
+        this.wsServer = new ws.Server({ server: this.httpServer });
     }
     setupCommands() {
         const validateSessionIDHelper = (playerID, request) => {
@@ -283,35 +278,35 @@ class SessionServer {
             if (!validateSessionIDHelper(playerID, "sessionLeave")) {
                 return;
             }
-            if (!this.sessions[this.sessionIDByPlayerID[playerID]].RemovePlayerByID(playerID)) {
-                this.sendMessageToPlayer(playerID, JSON.stringify({
+            // store session and player ID to inform potential remaining clients
+            const leavingPlayerID = playerID;
+            const sessionID = this.sessionIDByPlayerID[leavingPlayerID];
+            if (!this.sessions[sessionID].RemovePlayerByID(leavingPlayerID)) {
+                this.sendMessageToPlayer(leavingPlayerID, JSON.stringify({
                     "command": "sessionLeave",
                     "error": 4
                 }));
                 return;
             }
-            console.log(`[SessionServer] Players remaining in session ${this.sessionIDByPlayerID[playerID]}: ${this.sessions[this.sessionIDByPlayerID[playerID]].CurrentPlayerCount}`);
-            if (!this.sessions[this.sessionIDByPlayerID[playerID]].CurrentPlayerCount) {
-                console.log(`[SessionServer] Session ${this.sessionIDByPlayerID[playerID]} has no players left; discarding it`);
-                delete this.sessions[this.sessionIDByPlayerID[playerID]];
+            console.log(`[SessionServer] Players remaining in session ${this.sessionIDByPlayerID[leavingPlayerID]}: ${this.sessions[this.sessionIDByPlayerID[leavingPlayerID]].CurrentPlayerCount}`);
+            if (!this.sessions[this.sessionIDByPlayerID[leavingPlayerID]].CurrentPlayerCount) {
+                console.log(`[SessionServer] Session ${this.sessionIDByPlayerID[leavingPlayerID]} has no players left; discarding it`);
+                delete this.sessions[this.sessionIDByPlayerID[leavingPlayerID]];
             }
-            // store session and player ID to inform potential remaining clients
-            const leavingPlayerID = playerID;
-            const sessionIDLeft = this.sessionIDByPlayerID[leavingPlayerID];
             // reset association of player
-            this.sessionIDByPlayerID[playerID] = -1;
+            this.sessionIDByPlayerID[leavingPlayerID] = -1;
             // inform leaving player about success
-            this.sendMessageToPlayer(playerID, JSON.stringify({
+            this.sendMessageToPlayer(leavingPlayerID, JSON.stringify({
                 "command": "sessionLeave",
                 "error": 0
             }));
             // inform remaining players about leaving player
             // sessions are destroyed, if the last player left
-            if (!this.sessions[sessionIDLeft]) {
+            if (!this.sessions[sessionID]) {
                 return;
             }
             // send message about leaving player
-            this.sessions[sessionIDLeft].ForEachPlayer(((playerID) => {
+            this.sessions[sessionID].ForEachPlayer(((playerID) => {
                 this.sendMessageToPlayer(playerID, JSON.stringify({
                     "command": "playerLeave",
                     "error": 0,
@@ -321,18 +316,16 @@ class SessionServer {
         };
     }
     generatePlayerMessageHandler(playerID) {
-        return (message) => {
-            if (message.type === 'utf8') {
-                try {
-                    const jsonMessage = JSON.parse(message.utf8Data);
-                    this.handleMessage(playerID, jsonMessage);
-                }
-                catch (e) {
-                    console.group("Invalid JSON string received");
-                    console.error(message);
-                    console.error(e);
-                    console.groupEnd();
-                }
+        return (data) => {
+            try {
+                const jsonMessage = JSON.parse(data);
+                this.handleMessage(playerID, jsonMessage);
+            }
+            catch (e) {
+                console.group("Invalid JSON string received");
+                console.error(data);
+                console.error(e);
+                console.groupEnd();
             }
         };
     }
@@ -341,34 +334,40 @@ class SessionServer {
             this.removePlayer(playerID);
         };
     }
-    addPlayer(request) {
-        const connection = request.accept(undefined, request.origin);
+    addPlayer(socket, request) {
         const playerID = this.generatePlayerID();
-        this.player[playerID] = connection;
+        this.player[playerID] = socket;
         this.sessionIDByPlayerID[playerID] = -1;
         this.player[playerID].on('message', this.generatePlayerMessageHandler(playerID));
         this.player[playerID].on('close', this.generatePlayerCloseHandler(playerID));
     }
     removePlayer(playerID) {
         console.log(`[SessionServer] Connection from player ${playerID} closed...`);
+        if (this.player[playerID]) {
+            console.log(`[SessionServer] Player ${playerID} gracefully disconnected...`);
+            return;
+        }
+        console.log(`[SessionServer] Player ${playerID} was still connected - cleaning up...`);
         if (this.sessionIDByPlayerID[playerID] != -1) {
             this.commands.leaveSession(playerID, {});
             this.sessionIDByPlayerID[playerID] = -1;
         }
         delete this.player[playerID];
         delete this.sessionIDByPlayerID[playerID];
+        console.log(`[SessionServer] Player ${playerID} removed`);
     }
     static Create(port) {
         return new Promise((resolve, reject) => {
             const newServer = new SessionServer(port);
             newServer.setupCommands();
-            newServer.wsServer.on('request', newServer.addPlayer.bind(newServer));
+            newServer.wsServer.on('connection', newServer.addPlayer.bind(newServer));
             newServer.httpServer.on('listening', () => {
                 console.log(`[SessionServer] Listening on port ${newServer.port}...`);
                 resolve(newServer);
             });
-            newServer.wsServer.on('error', () => {
+            newServer.wsServer.on('error', (error) => {
                 console.group(`[SessionServer] Error initializing server`);
+                console.error(error);
                 reject();
             });
             newServer.httpServer.listen(newServer.port);
@@ -376,9 +375,9 @@ class SessionServer {
     }
     Shutdown() {
         return new Promise((resolve, reject) => {
-            this.httpServer.shutdown(() => {
-                resolve();
-            });
+            this.wsServer.clients.forEach((ws) => ws.close(1337, "Server shutdown initiated!"));
+            this.httpServer.close(() => this.wsServer.close());
+            resolve();
         });
     }
     Running() {

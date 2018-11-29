@@ -97,6 +97,11 @@ describe('SessionServer multi user session', () => {
             });
         })).resolves.toBeUndefined();
     }));
+    afterAll(() => __awaiter(this, void 0, void 0, function* () {
+        client.close();
+        client2.close();
+        yield server.Shutdown();
+    }));
     beforeEach(() => {
         // clear message stacks
         clientMessageStack = [];
@@ -211,10 +216,5 @@ describe('SessionServer multi user session', () => {
         // leave session and verify ID
         const leaveSessionRequest2 = yield new PingPong(client2, '{"command": "leaveSession" }', /{"command":"sessionLeave","error":0}/, true).Execute();
     }));
-    afterAll(() => {
-        client.close();
-        client2.close();
-        server.Shutdown();
-    });
 });
 //# sourceMappingURL=SessionServer.multiuser.test.js.map

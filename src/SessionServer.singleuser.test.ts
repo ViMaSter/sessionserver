@@ -93,9 +93,9 @@ describe('SessionServer single user session', () => {
 		})).resolves.toBeUndefined();
 	});
 
-	afterAll(() => {
+	afterAll(async () => {
 		client.close();
-		server.Shutdown();
+		await server.Shutdown();
 	});
 
 	test('leaveSession + createSession (same parameters)', async () => {

@@ -148,4 +148,4 @@ describe('SessionServer single user session', () => {
         yield new Promise((resolve, reject) => { setTimeout(() => { resolve(); }, 100); });
     }));
 });
-//# sourceMappingURL=SessionServer.test.js.map
+//# sourceMappingURL=SessionServer.singleuser.test.js.map
