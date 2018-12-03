@@ -210,6 +210,16 @@ export class SessionServer
 
 		this.commands["createSession"] = (playerID : number, jsonMessage : any) =>
 		{
+			// a player can only be connected to one session at a time
+			if (this.sessionIDByPlayerID[playerID] != -1)
+			{
+				this.sendMessageToPlayer(playerID, JSON.stringify({
+					"command": "sessionJoin",
+					"error": 1
+				}));
+				return;
+			}
+
 			const newSessionID = this.generateSessionID();
 			this.sessions[newSessionID] = new Session(newSessionID, jsonMessage.session, jsonMessage.player);
 

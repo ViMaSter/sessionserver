@@ -55,7 +55,7 @@ class PingPong {
 describe('SessionServer multi user session', () => {
     const secureConnection = false;
     const hostname = "localhost";
-    const port = 7000;
+    const port = 7001;
     let server;
     let client;
     let client2;

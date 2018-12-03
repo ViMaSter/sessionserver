@@ -142,10 +142,6 @@ describe('SessionServer single user session', () => {
         expect(newPlayerID2).toBe(playerID);
         expect(newPlayerID2).toBe(newPlayerID);
     }));
-    test('leavePlayer', () => __awaiter(this, void 0, void 0, function* () {
-        // leave session and verify ID
-        const leaveSessionRequest = yield new PingPong(client, '{"command": "leaveSession" }', /{"command":"sessionLeave","error":0}/, true).Execute();
-        yield new Promise((resolve, reject) => { setTimeout(() => { resolve(); }, 100); });
-    }));
+    // @TODO: createSession() (when still in session)
 });
 //# sourceMappingURL=SessionServer.singleuser.test.js.map

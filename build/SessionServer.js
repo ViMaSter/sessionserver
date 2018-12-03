@@ -160,6 +160,14 @@ class SessionServer {
             return true;
         };
         this.commands["createSession"] = (playerID, jsonMessage) => {
+            // a player can only be connected to one session at a time
+            if (this.sessionIDByPlayerID[playerID] != -1) {
+                this.sendMessageToPlayer(playerID, JSON.stringify({
+                    "command": "sessionJoin",
+                    "error": 1
+                }));
+                return;
+            }
             const newSessionID = this.generateSessionID();
             this.sessions[newSessionID] = new Session(newSessionID, jsonMessage.session, jsonMessage.player);
             console.log(`[SessionServer] Created new session with ID ${newSessionID} for player ${playerID}`);
@@ -343,7 +351,7 @@ class SessionServer {
     }
     removePlayer(playerID) {
         console.log(`[SessionServer] Connection from player ${playerID} closed...`);
-        if (this.player[playerID]) {
+        if (!this.player[playerID]) {
             console.log(`[SessionServer] Player ${playerID} gracefully disconnected...`);
             return;
         }
@@ -375,9 +383,10 @@ class SessionServer {
     }
     Shutdown() {
         return new Promise((resolve, reject) => {
-            this.wsServer.clients.forEach((ws) => ws.close(1337, "Server shutdown initiated!"));
-            this.httpServer.close(() => this.wsServer.close());
-            resolve();
+            this.httpServer.close(() => {
+                this.wsServer.close();
+                resolve();
+            });
         });
     }
     Running() {
@@ -406,6 +415,10 @@ class SessionServer {
         }
         console.log("Message to " + playerID);
         console.log(message);
+        if (this.player[playerID].readyState != 1) {
+            console.warn("[SessionServer] Can't send message to player, since the connection is (already) unavailable - readyState: " + this.player[playerID].readyState);
+            return;
+        }
         this.player[playerID].send(message);
         return true;
     }
