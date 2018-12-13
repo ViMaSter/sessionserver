@@ -142,6 +142,9 @@ describe('SessionServer single user session', () => {
         expect(newPlayerID2).toBe(playerID);
         expect(newPlayerID2).toBe(newPlayerID);
     }));
+    test('createSession (fails)', () => __awaiter(this, void 0, void 0, function* () {
+        const createSessionRequest = yield new PingPong(client, '{"command":"createSession","session": {"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player": {"name":"Unnamed Player","position":{"x":-1,"y":-1},"colorHex":49407}}', /{"command":"sessionJoin","error":1}/, true).Execute();
+    }));
     // @TODO: createSession() (when still in session)
 });
 //# sourceMappingURL=SessionServer.singleuser.test.js.map
