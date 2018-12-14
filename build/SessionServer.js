@@ -1,4 +1,12 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
@@ -7,17 +15,14 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-if (Array.prototype.remove) {
-    Array.prototype.remove = function (elem) {
-        return this.filter(e => e !== elem);
-    };
-}
 const deepKeys = (object, stack = []) => {
-    Object.keys(object).forEach((element) => {
+    Object.keys(object)
+        .forEach((element) => {
         // Escape . in the element name
-        var escaped = element.replace(/\./g, '\\\.');
+        const escaped = element.replace(/\./g, '\\\.');
         // If it's a nested object
-        if ((object[element] !== null && typeof object[element] === 'object' && !(object[element] instanceof Date)) && !Array.isArray(object[element])) {
+        if ((object[element] !== null && typeof object[element] === 'object' && !(object[element] instanceof Date))
+            && !Array.isArray(object[element])) {
             deepKeys(object[element], stack);
         }
         else {
@@ -27,71 +32,75 @@ const deepKeys = (object, stack = []) => {
     });
     return stack;
 };
+/* tslint:enable:no-any no-unsafe-any */
 // helper classes to ensure we're not relying on the actual data of either the session or players
 class ISessionData {
-}
-;
+} // tslint:disable-line:no-unnecessary-class
 class IPlayerData {
-}
-;
+} // tslint:disable-line:no-unnecessary-class
 class Session {
     constructor(ID, sessionData, playerData) {
-        this.connectedPlayers = {};
+        this.connectedPlayers = new Map();
         this.ID = ID;
         this.defaultSessionData = sessionData;
         this.defaultPlayerData = playerData;
         this.currentSessionData = Object.assign({}, this.defaultSessionData);
     }
-    get CurrentPlayerCount() { return Object.keys(this.connectedPlayers).length; }
-    ;
+    get CurrentPlayerCount() { return this.connectedPlayers.size; }
     // player handling
     ForEachPlayer(callback) {
-        Object.keys(this.connectedPlayers).map((item) => { return parseInt(item); }).forEach(callback);
+        if (this.connectedPlayers.size <= 0) {
+            console.error('[SessionServer] Library error: Attempting to itterate over players inside an empty session!');
+            return;
+        }
+        this.connectedPlayers.forEach((playerData, playerID, containingMap) => {
+            callback(playerID);
+        });
     }
     HasPlayerIDInSession(playerID) {
-        return !!this.connectedPlayers[playerID];
+        return this.connectedPlayers.has(playerID);
     }
     AddPlayerByID(playerID) {
         if (this.HasPlayerIDInSession(playerID)) {
-            console.error(`[SessionServer] Player ${playerID} is already part of session ${this.ID} (current players: ${Object.keys(this.connectedPlayers).join(', ')})`);
+            console.error(`[SessionServer] Player ${playerID} is already part of session ${this.ID} (current players: ${this.connectedPlayers.keys()})`);
             return false;
         }
-        this.connectedPlayers[playerID] = Object.assign({}, this.defaultPlayerData);
+        this.connectedPlayers.set(playerID, Object.assign({}, this.defaultPlayerData));
         return true;
     }
     RemovePlayerByID(playerID) {
         if (!this.HasPlayerIDInSession(playerID)) {
-            console.error(`[SessionServer] Player ${playerID} is not part of session ${this.ID} (current players: ${Object.keys(this.connectedPlayers).join(', ')})`);
+            console.error(`[SessionServer] Player ${playerID} is not part of session ${this.ID} (current players: ${this.connectedPlayers.keys()})`);
             return false;
         }
-        delete this.connectedPlayers[playerID];
+        this.connectedPlayers.delete(playerID);
         return true;
     }
     // player data handling
     GetPlayerDataByID(playerID) {
         if (!this.HasPlayerIDInSession(playerID)) {
-            console.error(`[SessionServer] Player ${playerID} is not part of session ${this.ID} and therefore can't receive his data (current players: ${Object.keys(this.connectedPlayers).join(', ')})`);
-            return {};
+            console.error(`[SessionServer] Player ${playerID} is not part of session ${this.ID} and therefore can't receive his data (current players: ${this.connectedPlayers.keys()})`);
+            return new IPlayerData();
         }
-        return this.connectedPlayers[playerID];
+        return this.connectedPlayers.get(playerID);
     }
     UpdatePlayerByID(playerID, playerUpdateArguments) {
         if (!this.HasPlayerIDInSession(playerID)) {
-            console.error(`[SessionServer] Player ${playerID} is not part of session ${this.ID} and therefore can't update his data (current players: ${Object.keys(this.connectedPlayers).join(', ')})`);
+            console.error(`[SessionServer] Player ${playerID} is not part of session ${this.ID} and therefore can't update his data (current players: ${this.connectedPlayers.keys()})`);
             return false;
         }
-        if (JSON.stringify(deepKeys(this.defaultPlayerData)) != JSON.stringify(deepKeys(playerUpdateArguments))) {
+        if (JSON.stringify(deepKeys(this.defaultPlayerData)) !== JSON.stringify(deepKeys(playerUpdateArguments))) {
             console.group(`[SessionServer] Player ${playerID} is attempting to update his player data with additional/missing fields`);
-            console.error("Default player data structure:");
+            console.error('Default player data structure:');
             console.error(this.defaultPlayerData);
-            console.error("Requested data:");
+            console.error('Requested data:');
             console.error(playerUpdateArguments);
-            console.error("Current player data structure:");
-            console.error(this.connectedPlayers[playerID]);
+            console.error('Current player data structure:');
+            console.error(this.connectedPlayers.get(playerID));
             console.groupEnd();
             return false;
         }
-        this.connectedPlayers[playerID] = playerUpdateArguments;
+        this.connectedPlayers.set(playerID, playerUpdateArguments);
         return true;
     }
     // session data handling
@@ -109,219 +118,290 @@ class Session {
         //   the associated sessionUpdate-websocket message propagates this change to every client and requires a
         //   playerUpdate-call from every player, as other game modes might require other player data
         console.log(`[SessionServer] Resetting every player's data due to change in defaultSessionData-object`);
-        this.ForEachPlayer((playerID) => {
-            this.UpdatePlayerByID(playerID, this.defaultPlayerData);
+        this.ForEachPlayer((currentPlayerID) => {
+            this.UpdatePlayerByID(currentPlayerID, this.defaultPlayerData);
         });
-        return true;
     }
 }
-;
 const http = __importStar(require("http"));
 const ws = __importStar(require("ws"));
+class CommandPayload {
+    constructor() {
+        this.command = '';
+    }
+}
 class SessionServer {
     constructor(port) {
-        this.commands = {};
+        this.commands = new Map();
         this.nextSessionID = 0;
-        this.sessions = {};
+        this.sessions = new Map();
         this.nextPlayerID = 0;
-        this.player = {};
-        this.sessionIDByPlayerID = {};
+        this.player = new Map();
+        this.sessionIDByPlayerID = new Map();
         this.port = -1;
+        this.addPlayer = (socket, request) => {
+            const playerID = this.generatePlayerID();
+            this.player.set(playerID, socket);
+            this.sessionIDByPlayerID.set(playerID, -1);
+            socket.on('message', this.generatePlayerMessageHandler(playerID));
+            socket.on('close', this.generatePlayerCloseHandler(playerID));
+        };
         this.port = port;
         this.httpServer = http.createServer();
         this.wsServer = new ws.Server({ server: this.httpServer });
     }
+    static Create(port) {
+        return __awaiter(this, void 0, void 0, function* () {
+            return new Promise((resolve, reject) => {
+                const newServer = new SessionServer(port);
+                newServer.setupCommands();
+                newServer.wsServer.on('connection', newServer.addPlayer);
+                newServer.httpServer.on('listening', () => {
+                    console.log(`[SessionServer] Listening on port ${newServer.port}...`);
+                    resolve(newServer);
+                });
+                newServer.wsServer.on('error', (error) => {
+                    console.group(`[SessionServer] Error initializing server`);
+                    console.error(error);
+                    reject();
+                });
+                newServer.httpServer.listen(newServer.port);
+            });
+        });
+    }
+    Shutdown() {
+        return __awaiter(this, void 0, void 0, function* () {
+            return new Promise((resolve, reject) => {
+                this.httpServer.close(() => {
+                    this.wsServer.close();
+                    resolve();
+                });
+            });
+        });
+    }
+    Running() {
+        return this.httpServer.listening;
+    }
     setupCommands() {
         const validateSessionIDHelper = (playerID, request) => {
-            if (typeof this.sessionIDByPlayerID[playerID] != "number") {
+            if (!this.sessionIDByPlayerID.has(playerID)) {
                 console.error(`[SessionServer] ${request} requires player '${playerID}' to exist in sessionIDByPlayerID - ensure his connection was handled correctly`);
                 this.sendMessageToPlayer(playerID, JSON.stringify({
-                    "command": request,
-                    "error": 1
+                    command: request,
+                    error: 1
                 }));
                 return false;
             }
-            if (this.sessionIDByPlayerID[playerID] == -1) {
+            if (this.sessionIDByPlayerID.get(playerID) === -1) {
                 console.error(`[SessionServer] ${request} requires player '${playerID}' to be in a session`);
                 this.sendMessageToPlayer(playerID, JSON.stringify({
-                    "command": request,
-                    "error": 2
+                    command: request,
+                    error: 2
                 }));
                 return false;
             }
-            if (!this.sessions[this.sessionIDByPlayerID[playerID]]) {
-                console.error(`[SessionServer] Attemping to run ${request} and player '${playerID}' is in a session (ID: ${this.sessionIDByPlayerID[playerID]}) which doesn't exist (any more)`);
+            if (!this.sessions.has(this.sessionIDByPlayerID.get(playerID))) {
+                console.error(`[SessionServer] Attemping to run ${request} and player '${playerID}' is in a session (ID: ${this.sessionIDByPlayerID.get(playerID)}) which doesn't exist (any more)`);
                 this.sendMessageToPlayer(playerID, JSON.stringify({
-                    "command": request,
-                    "error": 3
+                    command: request,
+                    error: 3
                 }));
                 return false;
             }
             return true;
         };
-        this.commands["createSession"] = (playerID, jsonMessage) => {
+        // TODO @VM Refactor to dynamic payload+function tuple (probably involves changing `commands`)
+        class CreateSessionPayload extends CommandPayload {
+            constructor() {
+                super(...arguments);
+                this.session = new Object();
+                this.sessionID = -1;
+                this.player = new Object();
+            }
+        }
+        this.commands.set('createSession', (playerID, jsonMessage) => {
             // a player can only be connected to one session at a time
-            if (this.sessionIDByPlayerID[playerID] != -1) {
+            if (this.sessionIDByPlayerID.get(playerID) !== -1) {
                 this.sendMessageToPlayer(playerID, JSON.stringify({
-                    "command": "sessionJoin",
-                    "error": 1
+                    command: 'sessionJoin',
+                    error: 4
                 }));
                 return;
             }
             const newSessionID = this.generateSessionID();
-            this.sessions[newSessionID] = new Session(newSessionID, jsonMessage.session, jsonMessage.player);
+            this.sessions.set(newSessionID, new Session(newSessionID, jsonMessage.session, jsonMessage.player));
             console.log(`[SessionServer] Created new session with ID ${newSessionID} for player ${playerID}`);
             jsonMessage.sessionID = newSessionID;
-            this.commands.joinSession(playerID, jsonMessage);
-        };
-        this.commands["updateSession"] = (playerID, jsonMessage) => {
-            console.log(`[SessionServer] Player ${playerID} attempting to update his session (${this.sessionIDByPlayerID[playerID] || "no session"})`);
-            if (!validateSessionIDHelper(playerID, "sessionUpdate")) {
+            this.commands.get('joinSession')(playerID, jsonMessage);
+        });
+        class UpdateSessionPayload extends CommandPayload {
+            constructor() {
+                super(...arguments);
+                this.session = new Object();
+                this.player = new Object();
+            }
+        }
+        this.commands.set('updateSession', (playerID, jsonMessage) => {
+            console.log(`[SessionServer] Player ${playerID} attempting to update his session (${this.sessionIDByPlayerID.has(playerID) ? this.sessionIDByPlayerID.get(playerID) : 'no session'})`);
+            if (!validateSessionIDHelper(playerID, 'sessionUpdate')) {
                 return;
             }
-            if (!this.sessions[this.sessionIDByPlayerID[playerID]].UpdateSessionData(playerID, jsonMessage.session, jsonMessage.player)) {
-                this.sendMessageToPlayer(playerID, JSON.stringify({
-                    "command": "sessionUpdate",
-                    "error": 4
+            const playerSessionID = this.sessionIDByPlayerID.get(playerID);
+            const playerSession = this.sessions.get(playerSessionID);
+            playerSession.UpdateSessionData(playerID, jsonMessage.session, jsonMessage.player);
+            playerSession.ForEachPlayer((currentPlayerID) => {
+                console.log(`[SessionServer] INFO ${currentPlayerID} by ${playerID}`);
+                this.sendMessageToPlayer(currentPlayerID, JSON.stringify({
+                    command: 'sessionUpdate',
+                    error: 0,
+                    session: playerSession.GetSessionData(),
+                    player: playerSession.GetDefaultPlayerData()
                 }));
+            });
+        });
+        class UpdatePlayerPayload extends CommandPayload {
+            constructor() {
+                super(...arguments);
+                this.player = new Object();
             }
-            this.sessions[this.sessionIDByPlayerID[playerID]].ForEachPlayer(((playerID) => {
-                this.sendMessageToPlayer(playerID, JSON.stringify({
-                    "command": "sessionUpdate",
-                    "error": 0,
-                    "session": this.sessions[this.sessionIDByPlayerID[playerID]].GetSessionData(),
-                    "player": this.sessions[this.sessionIDByPlayerID[playerID]].GetDefaultPlayerData()
-                }));
-            }).bind(this));
-        };
-        this.commands["updatePlayer"] = (playerID, jsonMessage) => {
-            console.log(`[SessionServer] Player ${playerID} attempting to update his player data for session (${this.sessionIDByPlayerID[playerID] || "no session"})`);
-            if (!validateSessionIDHelper(playerID, "playerUpdate")) {
+        }
+        this.commands.set('updatePlayer', (playerID, jsonMessage) => {
+            console.log(`[SessionServer] Player ${playerID} attempting to update his player data for session (${this.sessionIDByPlayerID.has(playerID) ? this.sessionIDByPlayerID.get(playerID) : 'no session'})`);
+            if (!validateSessionIDHelper(playerID, 'playerUpdate')) {
                 return;
             }
-            if (!this.sessions[this.sessionIDByPlayerID[playerID]].UpdatePlayerByID(playerID, jsonMessage.player)) {
+            const playerSessionID = this.sessionIDByPlayerID.get(playerID);
+            const playerSession = this.sessions.get(playerSessionID);
+            if (!playerSession.UpdatePlayerByID(playerID, jsonMessage.player)) {
                 this.sendMessageToPlayer(playerID, JSON.stringify({
-                    "command": "playerUpdate",
-                    "error": 4
+                    command: 'playerUpdate',
+                    error: 4
                 }));
             }
             const updatedPlayerID = playerID;
-            this.sessions[this.sessionIDByPlayerID[playerID]].ForEachPlayer(((playerID) => {
-                this.sendMessageToPlayer(playerID, JSON.stringify({
-                    "command": "playerUpdate",
-                    "error": 0,
-                    "playerID": updatedPlayerID,
-                    "player": this.sessions[this.sessionIDByPlayerID[playerID]].GetPlayerDataByID(updatedPlayerID)
+            playerSession.ForEachPlayer((currentPlayerID) => {
+                this.sendMessageToPlayer(currentPlayerID, JSON.stringify({
+                    command: 'playerUpdate',
+                    error: 0,
+                    playerID: updatedPlayerID,
+                    player: playerSession.GetPlayerDataByID(updatedPlayerID)
                 }));
-            }).bind(this));
-        };
-        this.commands["joinSession"] = (playerID, jsonMessage) => {
+            });
+        });
+        class JoinSessionPayload extends CommandPayload {
+            constructor() {
+                super(...arguments);
+                this.sessionID = -1;
+            }
+        }
+        this.commands.set('joinSession', (playerID, jsonMessage) => {
             console.log(`[SessionServer] Player ${playerID} attempting to join session (${jsonMessage.sessionID})`);
             // a player can only be connected to one session at a time
-            if (this.sessionIDByPlayerID[playerID] != -1) {
+            if (this.sessionIDByPlayerID.get(playerID) !== -1) {
                 this.sendMessageToPlayer(playerID, JSON.stringify({
-                    "command": "sessionJoin",
-                    "error": 1
+                    command: 'sessionJoin',
+                    error: 5
                 }));
                 return;
             }
             // if client requests to join session -1...
-            if (jsonMessage.sessionID == -1) {
+            if (jsonMessage.sessionID === -1) {
                 // ...and we don't have any current sessions
-                if (Object.keys(this.sessions).length <= 0) {
+                if (this.sessions.size <= 0) {
                     // ...return an error
                     this.sendMessageToPlayer(playerID, JSON.stringify({
-                        "command": "sessionJoin",
-                        "error": 2
+                        command: 'sessionJoin',
+                        error: 6
                     }));
                     return;
                 }
                 // otherwise he'll join the session created last
                 jsonMessage.sessionID = this.nextSessionID - 1;
             }
-            if (!this.sessions[jsonMessage.sessionID].AddPlayerByID(playerID)) {
+            const requestedSession = this.sessions.get(jsonMessage.sessionID);
+            if (!requestedSession.AddPlayerByID(playerID)) {
                 this.sendMessageToPlayer(playerID, JSON.stringify({
-                    "command": "sessionJoin",
-                    "error": 3
+                    command: 'sessionJoin',
+                    error: 7
                 }));
                 return;
             }
-            this.sessionIDByPlayerID[playerID] = jsonMessage.sessionID;
+            this.sessionIDByPlayerID.set(playerID, jsonMessage.sessionID);
             // send session state to new player...
             this.sendMessageToPlayer(playerID, JSON.stringify({
-                "command": "sessionJoin",
-                "error": 0,
-                "sessionID": this.sessionIDByPlayerID[playerID],
-                "playerID": playerID,
-                "session": this.sessions[this.sessionIDByPlayerID[playerID]].GetSessionData(),
-                "player": this.sessions[this.sessionIDByPlayerID[playerID]].GetPlayerDataByID(playerID)
+                command: 'sessionJoin',
+                error: 0,
+                sessionID: jsonMessage.sessionID,
+                playerID: playerID,
+                session: requestedSession.GetSessionData(),
+                player: requestedSession.GetPlayerDataByID(playerID)
             }));
             // ... and for every player already connected...
-            const newPlayerID = playerID;
-            const newPlayerSessionID = this.sessionIDByPlayerID[newPlayerID];
-            this.sessions[newPlayerSessionID].ForEachPlayer(((playerID) => {
+            requestedSession.ForEachPlayer((existingPlayerID) => {
                 // ...except for the new player...
-                if (playerID != newPlayerID) {
+                if (existingPlayerID !== playerID) {
                     // ...send updates to the new player about the existing player...
-                    console.log(`Informing player ${newPlayerID} about player ${playerID}`);
-                    this.sendMessageToPlayer(newPlayerID, JSON.stringify({
-                        "command": "playerJoin",
-                        "error": 0,
-                        "playerID": playerID,
-                        "player": this.sessions[newPlayerSessionID].GetPlayerDataByID(playerID)
+                    console.log(`Informing player ${playerID} about player ${existingPlayerID}`);
+                    this.sendMessageToPlayer(playerID, JSON.stringify({
+                        command: 'playerJoin',
+                        error: 0,
+                        playerID: existingPlayerID,
+                        player: requestedSession.GetPlayerDataByID(existingPlayerID)
                     }));
                     // ...and send updates to the existing player about the new player...
-                    console.log(`Informing player ${playerID} about player ${newPlayerID}`);
-                    this.sendMessageToPlayer(playerID, JSON.stringify({
-                        "command": "playerJoin",
-                        "error": 0,
-                        "playerID": newPlayerID,
-                        "player": this.sessions[newPlayerSessionID].GetPlayerDataByID(newPlayerID)
+                    console.log(`Informing player ${existingPlayerID} about player ${playerID}`);
+                    this.sendMessageToPlayer(existingPlayerID, JSON.stringify({
+                        command: 'playerJoin',
+                        error: 0,
+                        playerID: playerID,
+                        player: requestedSession.GetPlayerDataByID(playerID)
                     }));
                 }
-            }).bind(this));
-        };
-        this.commands["leaveSession"] = (playerID, jsonMessage) => {
-            console.log(`[SessionServer] Player ${playerID} attempting to leave his session (${this.sessionIDByPlayerID[playerID] || "no session"})`);
-            if (!validateSessionIDHelper(playerID, "sessionLeave")) {
+            });
+        });
+        class LeaveSessionPayload extends CommandPayload {
+        }
+        this.commands.set('leaveSession', (playerID, jsonMessage) => {
+            // store session and player ID to inform potential remaining clients
+            console.log(`[SessionServer] Player ${playerID} attempting to leave his session (${this.sessionIDByPlayerID.has(playerID) ? this.sessionIDByPlayerID.get(playerID) : 'no session'})`);
+            if (!validateSessionIDHelper(playerID, 'sessionLeave')) {
                 return;
             }
-            // store session and player ID to inform potential remaining clients
-            const leavingPlayerID = playerID;
-            const sessionID = this.sessionIDByPlayerID[leavingPlayerID];
-            if (!this.sessions[sessionID].RemovePlayerByID(leavingPlayerID)) {
-                this.sendMessageToPlayer(leavingPlayerID, JSON.stringify({
-                    "command": "sessionLeave",
-                    "error": 4
+            const sessionID = this.sessionIDByPlayerID.get(playerID);
+            const session = this.sessions.get(sessionID);
+            if (!session.RemovePlayerByID(playerID)) {
+                this.sendMessageToPlayer(playerID, JSON.stringify({
+                    command: 'sessionLeave',
+                    error: 4
                 }));
                 return;
             }
-            console.log(`[SessionServer] Players remaining in session ${this.sessionIDByPlayerID[leavingPlayerID]}: ${this.sessions[this.sessionIDByPlayerID[leavingPlayerID]].CurrentPlayerCount}`);
-            if (!this.sessions[this.sessionIDByPlayerID[leavingPlayerID]].CurrentPlayerCount) {
-                console.log(`[SessionServer] Session ${this.sessionIDByPlayerID[leavingPlayerID]} has no players left; discarding it`);
-                delete this.sessions[this.sessionIDByPlayerID[leavingPlayerID]];
+            console.log(`[SessionServer] Players remaining in session ${sessionID}: ${session.CurrentPlayerCount}`);
+            if (session.CurrentPlayerCount <= 0) {
+                console.log(`[SessionServer] Session ${sessionID} has no players left; discarding it`);
+                this.sessions.delete(sessionID);
             }
             // reset association of player
-            this.sessionIDByPlayerID[leavingPlayerID] = -1;
+            this.sessionIDByPlayerID.set(playerID, -1);
             // inform leaving player about success
-            this.sendMessageToPlayer(leavingPlayerID, JSON.stringify({
-                "command": "sessionLeave",
-                "error": 0
+            this.sendMessageToPlayer(playerID, JSON.stringify({
+                command: 'sessionLeave',
+                error: 0
             }));
             // inform remaining players about leaving player
             // sessions are destroyed, if the last player left
-            if (!this.sessions[sessionID]) {
+            if (!this.sessions.has(sessionID)) {
                 return;
             }
             // send message about leaving player
-            this.sessions[sessionID].ForEachPlayer(((playerID) => {
-                this.sendMessageToPlayer(playerID, JSON.stringify({
-                    "command": "playerLeave",
-                    "error": 0,
-                    "playerID": leavingPlayerID
+            session.ForEachPlayer((remainingPlayerID) => {
+                this.sendMessageToPlayer(remainingPlayerID, JSON.stringify({
+                    command: 'playerLeave',
+                    error: 0,
+                    playerID: playerID
                 }));
-            }).bind(this));
-        };
+            });
+        });
     }
     generatePlayerMessageHandler(playerID) {
         return (data) => {
@@ -330,7 +410,7 @@ class SessionServer {
                 this.handleMessage(playerID, jsonMessage);
             }
             catch (e) {
-                console.group("Invalid JSON string received");
+                console.group('Invalid JSON string received');
                 console.error(data);
                 console.error(e);
                 console.groupEnd();
@@ -342,87 +422,58 @@ class SessionServer {
             this.removePlayer(playerID);
         };
     }
-    addPlayer(socket, request) {
-        const playerID = this.generatePlayerID();
-        this.player[playerID] = socket;
-        this.sessionIDByPlayerID[playerID] = -1;
-        this.player[playerID].on('message', this.generatePlayerMessageHandler(playerID));
-        this.player[playerID].on('close', this.generatePlayerCloseHandler(playerID));
-    }
     removePlayer(playerID) {
         console.log(`[SessionServer] Connection from player ${playerID} closed...`);
-        if (!this.player[playerID]) {
+        if (!this.player.has(playerID)) {
             console.log(`[SessionServer] Player ${playerID} gracefully disconnected...`);
             return;
         }
         console.log(`[SessionServer] Player ${playerID} was still connected - cleaning up...`);
-        if (this.sessionIDByPlayerID[playerID] != -1) {
-            this.commands.leaveSession(playerID, {});
-            this.sessionIDByPlayerID[playerID] = -1;
+        if (this.sessionIDByPlayerID.get(playerID) !== -1) {
+            // remove the player from any session he was still in - this informs other players
+            this.commands.get('leaveSession')(playerID, new CommandPayload());
+            this.sessionIDByPlayerID.set(playerID, -1);
         }
-        delete this.player[playerID];
-        delete this.sessionIDByPlayerID[playerID];
+        this.player.delete(playerID);
+        this.sessionIDByPlayerID.delete(playerID);
         console.log(`[SessionServer] Player ${playerID} removed`);
     }
-    static Create(port) {
-        return new Promise((resolve, reject) => {
-            const newServer = new SessionServer(port);
-            newServer.setupCommands();
-            newServer.wsServer.on('connection', newServer.addPlayer.bind(newServer));
-            newServer.httpServer.on('listening', () => {
-                console.log(`[SessionServer] Listening on port ${newServer.port}...`);
-                resolve(newServer);
-            });
-            newServer.wsServer.on('error', (error) => {
-                console.group(`[SessionServer] Error initializing server`);
-                console.error(error);
-                reject();
-            });
-            newServer.httpServer.listen(newServer.port);
-        });
-    }
-    Shutdown() {
-        return new Promise((resolve, reject) => {
-            this.httpServer.close(() => {
-                this.wsServer.close();
-                resolve();
-            });
-        });
-    }
-    Running() {
-        return this.httpServer.shutdown();
-    }
     generatePlayerID() {
-        return this.nextPlayerID++;
+        const nextID = this.nextPlayerID;
+        this.nextPlayerID = this.nextPlayerID + 1;
+        return nextID;
     }
     generateSessionID() {
-        return this.nextSessionID++;
+        const nextID = this.nextSessionID;
+        this.nextSessionID = this.nextSessionID + 1;
+        return nextID;
     }
     handleMessage(playerID, jsonMessage) {
-        if (jsonMessage.command) {
-            if (typeof this.commands[jsonMessage.command] == "function") {
-                this.commands[jsonMessage.command].apply(this, [playerID, jsonMessage]);
-            }
-            else {
-                console.error(`[SessionServer] no command called "${jsonMessage.command}" available`);
-            }
+        if (jsonMessage.command.trim().length <= 0) {
+            console.error(`[SessionServer] Attemping to handle new message, but 'command'-field was not set`);
+        }
+        if (this.commands.has(jsonMessage.command)) {
+            this.commands.get(jsonMessage.command).apply(this, [playerID, jsonMessage]);
+        }
+        else {
+            console.error(`[SessionServer] Attemping to handle new message, but no command called "${jsonMessage.command}" available`);
         }
     }
     sendMessageToPlayer(playerID, message) {
-        if (!this.player[playerID]) {
+        if (!this.player.has(playerID)) {
             console.error(`[SessionServer] No player with ID ${playerID} is connected`);
             return false;
         }
-        console.log("Message to " + playerID);
+        const playerWebsocket = this.player.get(playerID);
+        console.log(`Message to ${playerID}`);
         console.log(message);
-        if (this.player[playerID].readyState != 1) {
-            console.warn("[SessionServer] Can't send message to player, since the connection is (already) unavailable - readyState: " + this.player[playerID].readyState);
-            return;
+        if (playerWebsocket.readyState !== 1) {
+            console.warn(`[SessionServer] Can\'t send message to player, since the connection is (already) unavailable - readyState: ${playerWebsocket.readyState}`);
+            return false;
         }
-        this.player[playerID].send(message);
+        playerWebsocket.send(message);
         return true;
     }
 }
 exports.SessionServer = SessionServer;
-;
 //# sourceMappingURL=SessionServer.js.map

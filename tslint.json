@@ -2,5 +2,22 @@
     "extends": ["tslint-microsoft-contrib"],
     "rulesDirectory": ["node_modules/tslint-microsoft-contrib"],
     "rules": {
+    	"function-name": [true, {
+	        "method-regex": "^[A-Z][\\w\\d]+$",
+	        "private-method-regex": "^[a-z][\\w\\d]+$",
+	        "protected-method-regex": "^[a-z][\\w\\d]+$",
+	        "static-method-regex": "^[A-Z][\\w\\d]+$"
+	    }],
+	    "no-console": [false],
+	    "no-backbone-get-set-outside-model": [false],
+	    "max-classes-per-file": [false],
+	    "completed-docs": [false],
+
+	    "max-line-length": { "options": { "ignore-pattern": "`" } },
+	    "max-func-body-length": [false],
+	    "newline-per-chained-call": [false],
+	    "mocha-no-side-effect-code": [false],
+	    "no-relative-imports": [true, "allow-siblings"],
+	    "no-suspicious-comment": { "severity": "warning"}
     }
 }

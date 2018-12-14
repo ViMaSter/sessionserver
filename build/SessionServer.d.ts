@@ -1,27 +1,22 @@
-declare global {
-    interface Array<T> {
-        remove(elem: T): Array<T>;
-    }
-}
 export declare class SessionServer {
-    private commands;
+    private readonly commands;
     private nextSessionID;
-    private sessions;
+    private readonly sessions;
     private nextPlayerID;
-    private player;
-    private sessionIDByPlayerID;
-    private port;
-    private httpServer;
-    private wsServer;
-    private setupCommands;
-    private generatePlayerMessageHandler;
-    private generatePlayerCloseHandler;
-    private addPlayer;
-    private removePlayer;
+    private readonly player;
+    private readonly sessionIDByPlayerID;
+    private readonly port;
+    private readonly httpServer;
+    private readonly wsServer;
     private constructor();
     static Create(port: number): Promise<SessionServer>;
     Shutdown(): Promise<void>;
     Running(): boolean;
+    private setupCommands;
+    private generatePlayerMessageHandler;
+    private generatePlayerCloseHandler;
+    private readonly addPlayer;
+    private removePlayer;
     private generatePlayerID;
     private generateSessionID;
     private handleMessage;

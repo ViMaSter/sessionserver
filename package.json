@@ -10,7 +10,7 @@
     "build": "tsc",
     "watch": "tsc -w",
     "test": "jest",
-    "tslint": "./node_modules/.bin/tslint --project ./tsconfig.json"
+    "lint": "tslint --project ./tsconfig.json"
   },
   "repository": {
     "type": "git",
