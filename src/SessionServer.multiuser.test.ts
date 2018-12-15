@@ -40,7 +40,14 @@ class PingPong
             {
                 expect(message.data).not.toMatch(this.expectedResponse);
             }
-            resolve(message.data.match(this.expectedResponse));
+
+			// halt our thread to first update clientMessageStack + client2MessageStack 
+			// and then finish execution of the PingPong
+			// otherwise this method might be done, without messages being accessable from the queue
+			// see: 'new message for client' + 'new message for client2'
+			setTimeout(() => {
+				resolve(message.data.match(this.expectedResponse));
+			}, 0);
         };
         return this.resolveMethod;
     }
