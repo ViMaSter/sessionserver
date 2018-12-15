@@ -10,7 +10,7 @@
 	    }],
 	    "no-console": [false],
 	    "no-backbone-get-set-outside-model": [false],
-	    "max-classes-per-file": [false],
+	    "max-classes-per-file": false,
 	    "completed-docs": [false],
 
 	    "max-line-length": { "options": { "ignore-pattern": "`" } },

@@ -1,55 +1,53 @@
 import {SessionServer} from './SessionServer';
 
-type resolveCallback = (isMatch : boolean) => void;
+type resolveCallback = (regexMatches : RegExpMatchArray) => void;
 type rejectCallback = () => void;
-class PingPong
-{
-    private sentMessage : string;
-    private expectedResponse : RegExp;
-    private client : WebSocket;
-    private isMatch : boolean;
+type resolveHandler = (message : MessageEvent) => void;
+type rejectHandler = () => void;
+class PingPong {
+    private readonly sentMessage : string;
+    private readonly expectedResponse : RegExp;
+    private readonly client : WebSocket;
+    private readonly isMatch : boolean;
+    private resolveMethod : resolveHandler;
+    private rejectMethod : rejectHandler;
 
-    private resolveMethod : any = () => {};
-    private rejectMethod : any = () => {};
- 
-    public constructor(client : WebSocket, ping : string, pong : RegExp, isMatch : boolean)
-    {
+    public constructor(client : WebSocket, ping : string, pong : RegExp, isMatch : boolean) {
         this.client = client;
         this.sentMessage = ping;
         this.expectedResponse = pong;
         this.isMatch = isMatch;
+        this.resolveMethod = (message : MessageEvent) : void => {}; // tslint:disable-line:no-empty
+        this.rejectMethod = () : void => {}; // tslint:disable-line:no-empty
     }
 
-    public Execute() : Promise<any>
-    { 
-        return new Promise<any>(((resolve : resolveCallback, reject : rejectCallback)=>{
-            this.client.addEventListener("message", this.handleMessage.call(this, resolve, reject));
-            this.client.addEventListener("close", this.handleClose.call(this, resolve, reject));
+    public async Execute() : Promise<RegExpMatchArray> {
+        return new Promise<RegExpMatchArray>((resolve : resolveCallback, reject : rejectCallback) : void => {
+            this.client.addEventListener('message', this.handleMessage(resolve, reject));
+            this.client.addEventListener('close', this.handleClose(resolve, reject));
             this.client.send(this.sentMessage);
-        }).bind(this));
+        });
     }
-    private handleMessage(resolve : resolveCallback, reject : rejectCallback)
-    {
-        this.resolveMethod = (message : MessageEvent) => {
-            this.client.removeEventListener("message", this.resolveMethod);
-            if (this.isMatch)
-            {
+    private handleMessage(resolve : resolveCallback, reject : rejectCallback) : resolveHandler {
+        this.resolveMethod = (message : MessageEvent) : void => {
+            this.client.removeEventListener('message', this.resolveMethod);
+            if (this.isMatch) {
                 expect(message.data).toMatch(this.expectedResponse);
-            }
-            else
-            {
+            } else {
                 expect(message.data).not.toMatch(this.expectedResponse);
             }
-            resolve(message.data.match(this.expectedResponse));
+
+            resolve(<RegExpMatchArray>(<string>message.data).match(this.expectedResponse));
         };
+
         return this.resolveMethod;
     }
-    private handleClose(resolve : resolveCallback, reject : rejectCallback)
-    {
-        this.rejectMethod = () => {
-            this.client.removeEventListener("close", this.rejectMethod);
+    private handleClose(resolve : resolveCallback, reject : rejectCallback) : rejectHandler {
+        this.rejectMethod = () : void => {
+            this.client.removeEventListener('close', this.rejectMethod);
             reject();
         };
+
         return this.rejectMethod;
     }
 }
@@ -79,7 +77,7 @@ describe('SessionServer single user session', () => {
         await expect(new Promise<void>((resolve : (() => void), reject : (() => void)) : void => {
             client.addEventListener('open', async () => {
                 // create session and retrieve ID
-                const createSessionRequest : string[] = await new PingPong(
+                const createSessionRequest : RegExpMatchArray = await new PingPong(
                     client,
                     '{"command":"createSession","session": {"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player": {"name":"Unnamed Player","position":{"x":-1,"y":-1},"colorHex":49407}}',
                     /{"command":"sessionJoin","error":0,"sessionID":(\d+),"playerID":(\d+),"session":{"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player":{"name":"Unnamed Player","position":{"x":-1,"y":-1},"colorHex":49407}}/,
@@ -107,7 +105,7 @@ describe('SessionServer single user session', () => {
 
     test('leaveSession + createSession (same parameters)', async () => {
         // leave session and verify ID
-        const leaveSessionRequest : string[] = await new PingPong(
+        const leaveSessionRequest : RegExpMatchArray = await new PingPong(
             client,
             '{"command": "leaveSession" }',
             /{"command":"sessionLeave","error":0}/,
@@ -115,7 +113,7 @@ describe('SessionServer single user session', () => {
         ).Execute();
 
         // create session and retrieve ID
-        const createSessionRequest : string[] = await new PingPong(
+        const createSessionRequest : RegExpMatchArray = await new PingPong(
             client,
             '{"command":"createSession","session": {"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player": {"name":"Unnamed Player","position":{"x":-1, "y":-1},"colorHex":49407}}',
             /{"command":"sessionJoin","error":0,"sessionID":(\d+),"playerID":(\d+),"session":{"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player":{"name":"Unnamed Player","position":{"x":-1,"y":-1},"colorHex":49407}}/,
@@ -132,14 +130,14 @@ describe('SessionServer single user session', () => {
 
     test('leaveSession + updateSession (fails) + createSession (same parameters)', async () => {
         // leave session and verify ID
-        const leaveSessionRequest : string[] = await new PingPong(
+        const leaveSessionRequest : RegExpMatchArray = await new PingPong(
             client,
             '{"command": "leaveSession" }',
             /{"command":"sessionLeave","error":0}/,
             true
         ).Execute();
 
-        const updateSessionRequest : string[] = await new PingPong(
+        const updateSessionRequest : RegExpMatchArray = await new PingPong(
             client,
             '{"command":"updateSession","session": {"mapName":"desert","gameType":"CaptureTheFlag","currentMatchStart":1543237287000},"player": {"name":"New Player","position":{"x":-20, "y":-20},"colorHex":16673386}}',
             /{"command":"sessionUpdate","error":2}/,
@@ -147,7 +145,7 @@ describe('SessionServer single user session', () => {
         ).Execute();
 
         // create session and retrieve ID
-        const createSessionRequest : string[] = await new PingPong(
+        const createSessionRequest : RegExpMatchArray = await new PingPong(
             client,
             '{"command":"createSession","session": {"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player": {"name":"Unnamed Player","position":{"x":-1, "y":-1},"colorHex":49407}}',
             /{"command":"sessionJoin","error":0,"sessionID":(\d+),"playerID":(\d+),"session":{"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player":{"name":"Unnamed Player","position":{"x":-1,"y":-1},"colorHex":49407}}/,
@@ -164,14 +162,14 @@ describe('SessionServer single user session', () => {
 
     test('leaveSession + updatePlayer (fails) + createSession (same parameters)', async () => {
         // leave session and verify ID
-        const leaveSessionRequest : string[] = await new PingPong(
+        const leaveSessionRequest : RegExpMatchArray = await new PingPong(
             client,
             '{"command": "leaveSession" }',
             /{"command":"sessionLeave","error":0}/,
             true
         ).Execute();
 
-        const updateSessionRequest : string[] = await new PingPong(
+        const updateSessionRequest : RegExpMatchArray = await new PingPong(
             client,
             '{"command":"updatePlayer", "player": {"name":"NotIntentional", "position":{"x":3.23, "y":1.00}, "colorHex":1942370}}',
             /{"command":"playerUpdate","error":2}/,
@@ -179,7 +177,7 @@ describe('SessionServer single user session', () => {
         ).Execute();
 
         // create session and retrieve ID
-        const createSessionRequest : string[] = await new PingPong(
+        const createSessionRequest : RegExpMatchArray = await new PingPong(
             client,
             '{"command":"createSession","session": {"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player": {"name":"Unnamed Player","position":{"x":-1, "y":-1},"colorHex":49407}}',
             /{"command":"sessionJoin","error":0,"sessionID":(\d+),"playerID":(\d+),"session":{"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player":{"name":"Unnamed Player","position":{"x":-1,"y":-1},"colorHex":49407}}/,
@@ -196,14 +194,14 @@ describe('SessionServer single user session', () => {
 
     test('leaveSession + leaveSession (fails) + createSession (same parameters)', async () => {
         // leave session and verify ID
-        const leaveSessionRequest : string[] = await new PingPong(
+        const leaveSessionRequest : RegExpMatchArray = await new PingPong(
             client,
             '{"command": "leaveSession" }',
             /{"command":"sessionLeave","error":0}/,
             true
         ).Execute();
 
-        const updateSessionRequest : string[] = await new PingPong(
+        const updateSessionRequest : RegExpMatchArray = await new PingPong(
             client,
             '{"command":"leaveSession" }',
             /{"command":"sessionLeave","error":2}/,
@@ -211,7 +209,7 @@ describe('SessionServer single user session', () => {
         ).Execute();
 
         // create session and retrieve ID
-        const createSessionRequest : string[] = await new PingPong(
+        const createSessionRequest : RegExpMatchArray = await new PingPong(
             client,
             '{"command":"createSession","session": {"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player": {"name":"Unnamed Player","position":{"x":-1, "y":-1},"colorHex":49407}}',
             /{"command":"sessionJoin","error":0,"sessionID":(\d+),"playerID":(\d+),"session":{"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player":{"name":"Unnamed Player","position":{"x":-1,"y":-1},"colorHex":49407}}/,
@@ -227,7 +225,7 @@ describe('SessionServer single user session', () => {
     });
 
     test('updateSession', async () => {
-        const updateSessionRequest : string[] = await new PingPong(
+        const updateSessionRequest : RegExpMatchArray = await new PingPong(
             client,
             '{"command":"updateSession","session": {"mapName":"desert","gameType":"CaptureTheFlag","currentMatchStart":1543237287000},"player": {"name":"New Player","position":{"x":-20, "y":-20},"colorHex":16673386}}',
             /{"command":"sessionUpdate","error":0,"session":{"mapName":"desert","gameType":"CaptureTheFlag","currentMatchStart":1543237287000},"player":{"name":"New Player","position":{"x":-20,"y":-20},"colorHex":16673386}}/,
@@ -237,7 +235,7 @@ describe('SessionServer single user session', () => {
     });
 
     test('updatePlayer', async () => {
-        const updateSessionRequest : string[] = await new PingPong(
+        const updateSessionRequest : RegExpMatchArray = await new PingPong(
             client,
             '{"command":"updatePlayer", "player": {"name":"DontLookNow", "position":{"x":14, "y":27}, "colorHex":16740352}}',
             /{"command":"playerUpdate","error":0,"playerID":(\d+),"player":{"name":"DontLookNow","position":{"x":14,"y":27},"colorHex":16740352}}/,
@@ -246,7 +244,7 @@ describe('SessionServer single user session', () => {
         const newPlayerID : number = parseInt(updateSessionRequest[1], 10);
         expect(newPlayerID).toBe(playerID);
 
-        const updateSessionRequest2 : string[] = await new PingPong(
+        const updateSessionRequest2 : RegExpMatchArray = await new PingPong(
             client,
             '{"command":"updatePlayer", "player": {"name":"NotIntentional", "position":{"x":3.23, "y":1.000000000001}, "colorHex":1942370}}',
             /{"command":"playerUpdate","error":0,"playerID":(\d+),"player":{"name":"NotIntentional","position":{"x":3.23,"y":1.000000000001},"colorHex":1942370}}/,
@@ -258,7 +256,7 @@ describe('SessionServer single user session', () => {
     });
 
     test('createSession (fails)', async () => {
-        const createSessionRequest : string[] = await new PingPong(
+        const createSessionRequest : RegExpMatchArray = await new PingPong(
             client,
             '{"command":"createSession","session": {"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player": {"name":"Unnamed Player","position":{"x":-1,"y":-1},"colorHex":49407}}',
             /{"command":"sessionJoin","error":4}/,
