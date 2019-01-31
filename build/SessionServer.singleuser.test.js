@@ -48,7 +48,7 @@ class PingPong {
 }
 describe('SessionServer single user session', () => {
     const secureConnection = false;
-    const hostname = "localhost";
+    const hostname = 'localhost';
     const port = 7000;
     let server;
     let client;
@@ -57,26 +57,30 @@ describe('SessionServer single user session', () => {
     beforeAll(() => __awaiter(this, void 0, void 0, function* () {
         // create a server
         server = yield SessionServer_1.SessionServer.Create(port);
+    }));
+    beforeEach(() => __awaiter(this, void 0, void 0, function* () {
         // create a client
-        client = new WebSocket(`${secureConnection ? "wss" : "ws"}://${hostname}:${port}/`);
+        client = new WebSocket(`${secureConnection ? 'wss' : 'ws'}://${hostname}:${port}/`);
         // create listeners and wait for success
         yield expect(new Promise((resolve, reject) => {
-            client.addEventListener("open", () => __awaiter(this, void 0, void 0, function* () {
+            client.addEventListener('open', () => __awaiter(this, void 0, void 0, function* () {
                 // create session and retrieve ID
                 const createSessionRequest = yield new PingPong(client, '{"command":"createSession","session": {"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player": {"name":"Unnamed Player","position":{"x":-1,"y":-1},"colorHex":49407}}', /{"command":"sessionJoin","error":0,"sessionID":(\d+),"playerID":(\d+),"session":{"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player":{"name":"Unnamed Player","position":{"x":-1,"y":-1},"colorHex":49407}}/, true).Execute();
-                sessionID = parseInt(createSessionRequest[1]);
-                playerID = parseInt(createSessionRequest[2]);
+                sessionID = parseInt(createSessionRequest[1], 10);
+                playerID = parseInt(createSessionRequest[2], 10);
                 expect(sessionID).toBeGreaterThan(-1);
                 expect(playerID).toBeGreaterThan(-1);
                 resolve();
             }));
-            client.addEventListener("close", () => __awaiter(this, void 0, void 0, function* () {
+            client.addEventListener('close', () => __awaiter(this, void 0, void 0, function* () {
                 reject();
             }));
         })).resolves.toBeUndefined();
     }));
-    afterAll(() => __awaiter(this, void 0, void 0, function* () {
+    afterEach(() => __awaiter(this, void 0, void 0, function* () {
         client.close();
+    }));
+    afterAll(() => __awaiter(this, void 0, void 0, function* () {
         yield server.Shutdown();
     }));
     test('leaveSession + createSession (same parameters)', () => __awaiter(this, void 0, void 0, function* () {
@@ -84,8 +88,8 @@ describe('SessionServer single user session', () => {
         const leaveSessionRequest = yield new PingPong(client, '{"command": "leaveSession" }', /{"command":"sessionLeave","error":0}/, true).Execute();
         // create session and retrieve ID
         const createSessionRequest = yield new PingPong(client, '{"command":"createSession","session": {"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player": {"name":"Unnamed Player","position":{"x":-1, "y":-1},"colorHex":49407}}', /{"command":"sessionJoin","error":0,"sessionID":(\d+),"playerID":(\d+),"session":{"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player":{"name":"Unnamed Player","position":{"x":-1,"y":-1},"colorHex":49407}}/, true).Execute();
-        const newSessionID = parseInt(createSessionRequest[1]);
-        const newPlayerID = parseInt(createSessionRequest[2]);
+        const newSessionID = parseInt(createSessionRequest[1], 10);
+        const newPlayerID = parseInt(createSessionRequest[2], 10);
         expect(newSessionID).not.toBe(sessionID);
         expect(newPlayerID).toBe(playerID);
         sessionID = newSessionID;
@@ -97,8 +101,8 @@ describe('SessionServer single user session', () => {
         const updateSessionRequest = yield new PingPong(client, '{"command":"updateSession","session": {"mapName":"desert","gameType":"CaptureTheFlag","currentMatchStart":1543237287000},"player": {"name":"New Player","position":{"x":-20, "y":-20},"colorHex":16673386}}', /{"command":"sessionUpdate","error":2}/, true).Execute();
         // create session and retrieve ID
         const createSessionRequest = yield new PingPong(client, '{"command":"createSession","session": {"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player": {"name":"Unnamed Player","position":{"x":-1, "y":-1},"colorHex":49407}}', /{"command":"sessionJoin","error":0,"sessionID":(\d+),"playerID":(\d+),"session":{"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player":{"name":"Unnamed Player","position":{"x":-1,"y":-1},"colorHex":49407}}/, true).Execute();
-        const newSessionID = parseInt(createSessionRequest[1]);
-        const newPlayerID = parseInt(createSessionRequest[2]);
+        const newSessionID = parseInt(createSessionRequest[1], 10);
+        const newPlayerID = parseInt(createSessionRequest[2], 10);
         expect(newSessionID).not.toBe(sessionID);
         expect(newPlayerID).toBe(playerID);
         sessionID = newSessionID;
@@ -110,8 +114,8 @@ describe('SessionServer single user session', () => {
         const updateSessionRequest = yield new PingPong(client, '{"command":"updatePlayer", "player": {"name":"NotIntentional", "position":{"x":3.23, "y":1.00}, "colorHex":1942370}}', /{"command":"playerUpdate","error":2}/, true).Execute();
         // create session and retrieve ID
         const createSessionRequest = yield new PingPong(client, '{"command":"createSession","session": {"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player": {"name":"Unnamed Player","position":{"x":-1, "y":-1},"colorHex":49407}}', /{"command":"sessionJoin","error":0,"sessionID":(\d+),"playerID":(\d+),"session":{"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player":{"name":"Unnamed Player","position":{"x":-1,"y":-1},"colorHex":49407}}/, true).Execute();
-        const newSessionID = parseInt(createSessionRequest[1]);
-        const newPlayerID = parseInt(createSessionRequest[2]);
+        const newSessionID = parseInt(createSessionRequest[1], 10);
+        const newPlayerID = parseInt(createSessionRequest[2], 10);
         expect(newSessionID).not.toBe(sessionID);
         expect(newPlayerID).toBe(playerID);
         sessionID = newSessionID;
@@ -123,8 +127,8 @@ describe('SessionServer single user session', () => {
         const updateSessionRequest = yield new PingPong(client, '{"command":"leaveSession" }', /{"command":"sessionLeave","error":2}/, true).Execute();
         // create session and retrieve ID
         const createSessionRequest = yield new PingPong(client, '{"command":"createSession","session": {"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player": {"name":"Unnamed Player","position":{"x":-1, "y":-1},"colorHex":49407}}', /{"command":"sessionJoin","error":0,"sessionID":(\d+),"playerID":(\d+),"session":{"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player":{"name":"Unnamed Player","position":{"x":-1,"y":-1},"colorHex":49407}}/, true).Execute();
-        const newSessionID = parseInt(createSessionRequest[1]);
-        const newPlayerID = parseInt(createSessionRequest[2]);
+        const newSessionID = parseInt(createSessionRequest[1], 10);
+        const newPlayerID = parseInt(createSessionRequest[2], 10);
         expect(newSessionID).not.toBe(sessionID);
         expect(newPlayerID).toBe(playerID);
         sessionID = newSessionID;
@@ -132,18 +136,19 @@ describe('SessionServer single user session', () => {
     }));
     test('updateSession', () => __awaiter(this, void 0, void 0, function* () {
         const updateSessionRequest = yield new PingPong(client, '{"command":"updateSession","session": {"mapName":"desert","gameType":"CaptureTheFlag","currentMatchStart":1543237287000},"player": {"name":"New Player","position":{"x":-20, "y":-20},"colorHex":16673386}}', /{"command":"sessionUpdate","error":0,"session":{"mapName":"desert","gameType":"CaptureTheFlag","currentMatchStart":1543237287000},"player":{"name":"New Player","position":{"x":-20,"y":-20},"colorHex":16673386}}/, true).Execute();
+        console.log(1);
     }));
     test('updatePlayer', () => __awaiter(this, void 0, void 0, function* () {
         const updateSessionRequest = yield new PingPong(client, '{"command":"updatePlayer", "player": {"name":"DontLookNow", "position":{"x":14, "y":27}, "colorHex":16740352}}', /{"command":"playerUpdate","error":0,"playerID":(\d+),"player":{"name":"DontLookNow","position":{"x":14,"y":27},"colorHex":16740352}}/, true).Execute();
-        const newPlayerID = parseInt(updateSessionRequest[1]);
+        const newPlayerID = parseInt(updateSessionRequest[1], 10);
         expect(newPlayerID).toBe(playerID);
         const updateSessionRequest2 = yield new PingPong(client, '{"command":"updatePlayer", "player": {"name":"NotIntentional", "position":{"x":3.23, "y":1.000000000001}, "colorHex":1942370}}', /{"command":"playerUpdate","error":0,"playerID":(\d+),"player":{"name":"NotIntentional","position":{"x":3.23,"y":1.000000000001},"colorHex":1942370}}/, true).Execute();
-        const newPlayerID2 = parseInt(updateSessionRequest[1]);
+        const newPlayerID2 = parseInt(updateSessionRequest[1], 10);
         expect(newPlayerID2).toBe(playerID);
         expect(newPlayerID2).toBe(newPlayerID);
     }));
     test('createSession (fails)', () => __awaiter(this, void 0, void 0, function* () {
-        const createSessionRequest = yield new PingPong(client, '{"command":"createSession","session": {"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player": {"name":"Unnamed Player","position":{"x":-1,"y":-1},"colorHex":49407}}', /{"command":"sessionJoin","error":1}/, true).Execute();
+        const createSessionRequest = yield new PingPong(client, '{"command":"createSession","session": {"mapName":"castle","gameType":"DeathMatch","currentMatchStart":1543236582000},"player": {"name":"Unnamed Player","position":{"x":-1,"y":-1},"colorHex":49407}}', /{"command":"sessionJoin","error":4}/, true).Execute();
     }));
     // @TODO: createSession() (when still in session)
 });
