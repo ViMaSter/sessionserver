@@ -143,6 +143,7 @@ class SessionServer {
             const playerID = this.generatePlayerID();
             this.player.set(playerID, socket);
             this.sessionIDByPlayerID.set(playerID, -1);
+            console.log(`[SessionServer] New connection detected - assigning player ID: playerID`);
             socket.on('message', this.generatePlayerMessageHandler(playerID));
             socket.on('close', this.generatePlayerCloseHandler(playerID));
         };
@@ -318,11 +319,20 @@ class SessionServer {
                 // otherwise he'll join the session created last
                 jsonMessage.sessionID = this.nextSessionID - 1;
             }
+            // if that session no longer exists
+            if (!this.sessions.has(jsonMessage.sessionID)) {
+                // ...return an error
+                this.sendMessageToPlayer(playerID, JSON.stringify({
+                    command: 'sessionJoin',
+                    error: 7
+                }));
+                return;
+            }
             const requestedSession = this.sessions.get(jsonMessage.sessionID);
             if (!requestedSession.AddPlayerByID(playerID)) {
                 this.sendMessageToPlayer(playerID, JSON.stringify({
                     command: 'sessionJoin',
-                    error: 7
+                    error: 8
                 }));
                 return;
             }

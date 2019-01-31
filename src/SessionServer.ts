@@ -495,6 +495,8 @@ export class SessionServer {
         this.player.set(playerID, socket);
         this.sessionIDByPlayerID.set(playerID, -1);
 
+        console.log(`[SessionServer] New connection detected - assigning player ID: playerID`);
+
         socket.on('message', this.generatePlayerMessageHandler(playerID));
         socket.on('close', this.generatePlayerCloseHandler(playerID));
     }
