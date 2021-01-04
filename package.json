@@ -28,7 +28,7 @@
   },
   "homepage": "https://github.com/ViMaSter/sessionserver",
   "devDependencies": {
-    "@types/jest": "^23.3.5",
+    "@types/jest": "^26.0.19",
     "@types/node": "^10.12.0",
     "@types/websocket": "0.0.40",
     "dts-bundle": "^0.7.3",
