@@ -15,5 +15,6 @@ module.exports = {
     "json",
     "node"
   ],
-  "setupTestFrameworkScriptFile": "jest-extended"
+  "setupTestFrameworkScriptFile": "jest-extended",
+  "reporters": ["default", "jest-junit"]
 }
