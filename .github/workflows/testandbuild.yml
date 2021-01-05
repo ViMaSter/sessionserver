@@ -11,11 +11,11 @@ jobs:
       uses: actions/setup-node@v1
       with:
         node-version: 14.x
-    - name: npm i
+    - name: Run 'npm install'
       run: npm install
-    - name: npm test
+    - name: Run tests
       run: npm test
-    - name: Publish Unit Test Results
+    - name: Publish unit test results
       uses: EnricoMi/publish-unit-test-result-action@v1.6
       if: always()
       with:
