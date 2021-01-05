@@ -1,10 +1,14 @@
 {
   "name": "sessionserver",
-  "version": "0.2.3",
+  "version": "0.2.5",
   "description": "Simple session server primarly for use with multiplayer games",
   "main": "build/main.js",
   "types": "build/main.d.ts",
   "test": "jest",
+  "files": [
+    "package.json",
+    "build"
+  ],
   "scripts": {
     "prepublishOnly": "npm run build",
     "build": "tsc",
