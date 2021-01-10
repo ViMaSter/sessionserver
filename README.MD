@@ -23,7 +23,10 @@ A session is composed of [Players](#players) and an associated **SessionData**-s
 When a session is initially created, the SessionData- and PlayerData-format is defined once, so only it's values can change. The only way to change the SessionData- and/or PlayerData-format, is by updating the Session. Important: This will yield in a reset of every players PlayerData-set and the SessionData to it's supplied defaults. (See [updateSession](#updateSession))
 
 ### Player and playerData
-A **player** is composed of an ID and an associated **PlayerData**-set. PlayerData is accessible to all players, but a player can only modify his own PlayerData-set. One player can only be in one session at a time.
+A **player** is composed of an ID and an associated **PlayerData**-set. PlayerData is accessible to all players, but a player can only modify their own PlayerData-set. A player can only be in **one session at a time**.
+
+If a player leaves a session, the **playerLeave**-event will be send to all remaining players in that session. Associated PlayerData will therefore also be dropped.  
+**Note: This also occurs automatically, if the connection to that player is lost.**
 
 ## Message format
 The server communicates through a WebSocket port (7000 by default) using JSON-encoded objects consisting of a "command"-field and properties changing based on the command. Both server and client use this structure for updates. Client-commands start with the verb (create, update, leave), Server-commands with the object affected (player, session).
