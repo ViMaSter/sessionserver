@@ -34,7 +34,7 @@
   "devDependencies": {
     "@types/jest": "^26.0.19",
     "@types/node": "^14.14.20",
-    "@types/websocket": "1.0.1",
+    "@types/websocket": "1.0.2",
     "dts-bundle": "^0.7.3",
     "http-shutdown": "^1.2.2",
     "jest": "^26.6.3",
